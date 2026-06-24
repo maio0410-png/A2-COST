@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成本計算 App</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px; margin-top: 30px;}
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .hidden { display: none; }
+        .result-box { background-color: #e9f5ff; padding: 15px; border-radius: 5px; margin-top: 10px; font-weight: bold; color: #0056b3; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 5px; width: 100%; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        button:hover { background-color: #0056b3; }
+        .btn-save { background-color: #28a745; }
+        .btn-save:hover { background-color: #218838; }
+        .btn-delete { background-color: #dc3545; padding: 5px 10px; font-size: 12px; width: auto; margin-top: 0; margin-left: 10px;}
+        .btn-delete:hover { background-color: #c82333; }
+        ul.history-list { list-style-type: none; padding: 0; }
+        ul.history-list li { background: #f8f9fa; margin-bottom: 10px; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        .history-date { font-size: 12px; color: #888; margin-bottom: 5px;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align: center; color: #007bff;">成本計算 App</h1>
+
+    <!-- 第一部分：原料 -->
+    <h2>第一部分：原料</h2>
+    <div class="form-group">
+        <label>原料採購性質</label>
+        <select id="purchaseType" onchange="togglePurchaseFields()">
+            <option value="domestic">國內採購 / 在庫品</option>
+            <option value="foreign">國外採購</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>原料採購價格 (若為國內/在庫品請填台幣金額)</label>
+        <input type="number" id="rawMaterialPrice" value="0">
+    </div>
+
+    <div id="foreignFields" class="hidden">
+        <div class="form-group">
+            <label>幣別選擇 (區分匯率用)</label>
+            <select id="currency">
+                <option value="USD">美金 (USD)</option>
+                <option value="EUR">歐元 (EUR)</option>
+                <option value="JPY">日圓 (JPY)</option>
+                <option value="CNY">人民幣 (CNY)</option>
+                <option value="AUD">澳幣 (AUD)</option>
+                <option value="other">其他</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>匯率 (請參考海關三旬匯率換算成台幣)</label>
+            <input type="number" id="exchangeRate" value="1" step="0.001">
+        </div>
+        <div class="form-group">
+            <label>關稅 (%) (請參考關港貿單一窗口公告)</label>
+            <input type="number" id="tariffRate" value="0" step="0.1">
+        </div>
+        <div class="form-group">
+            <label>雜費 (台幣)</label>
+            <input type="number" id="miscFees" value="0">
+        </div>
+    </div>
+    <div class="result-box" id="part1Result">原料成本 (台幣): 0 元</div>
+
+    <!-- 第二部分：加工品 -->
+    <h2>第二部分：加工品</h2>
+    <div class="form-group">
+        <label>是否為加工品？</label>
+        <select id="isProcessed" onchange="toggleProcessedFields()">
+            <option value="no">否</option>
+            <option value="yes">是</option>
+        </select>
+    </div>
+
+    <div id="processedFields" class="hidden">
+        <div class="form-group"><label>加工品名稱</label><input type="text" id="processedName"></div>
+        <div class="form-group"><label>解凍流失 (%) (A)</label><input type="number" id="lossA" value="0"></div>
+        <div class="form-group"><label>鋸台損耗 (%) (B)</label><input type="number" id="lossB" value="0"></div>
+        <div class="form-group"><label>贈送值 (%) (C)</label><input type="number" id="lossC" value="0"></div>
+        <div class="form-group"><label>凍結流失 (%) (D)</label><input type="number" id="lossD" value="0"></div>
+        <div class="form-group"><label>拌炒流失 (%) (E)</label><input type="number" id="lossE" value="0"></div>
+        
+        <div class="form-group">
+            <label>商品類型</label>
+            <select id="productType" onchange="toggleProductTypeFields()">
+                <option value="normal">一般加工品</option>
+                <option value="ice">包冰商品</option>
+                <option value="breaded">裹粉商品</option>
+            </select>
+        </div>
+
+        <div class="form-group hidden" id="iceField"><label>包冰率 (%) (H)</label><input type="number" id="iceRate" value="0"></div>
+        <div class="form-group hidden" id="breadedField"><label>裹粉率 (%) (I)</label><input type="number" id="breadingRate" value="0"></div>
+
+        <div class="form-group">
+            <label>計價方式 (J)</label>
+            <select id="pricingMethod" onchange="togglePricingFields()">
+                <option value="j1">公斤計價 (J1)</option>
+                <option value="j2">以包計價 (J2)</option>
+                <option value="j3">以件計價 (J3)</option>
+            </select>
+        </div>
+
+        <div class="form-group hidden" id="bagWeightField"><label>單包重量 (公斤/包)</label><input type="number" id="weightPerBag" value="1"></div>
+        <div class="form-group hidden" id="pieceWeightField"><label>單件重量 (公斤/件)</label><input type="number" id="weightPerPiece" value="1"></div>
+
+        <div class="form-group"><label>轉播價 (工廠直工+包材費) (K)</label><input type="number" id="transferPrice" value="0"></div>
+        <div class="result-box" id="part2Result">加工品成本 (未稅): 0 元</div>
+    </div>
+
+    <!-- 第三部分：含稅與毛利 -->
+    <h2>第三部分：含稅成本與毛利估算</h2>
+    <div class="result-box" id="taxedCostResult">含稅成本 (M): 0 元</div>
+    
+    <div class="form-group">
+        <label>計算模式選擇</label>
+        <select id="calcMode" onchange="toggleCalcMode()">
+            <option value="marginToPrice">輸入毛利率反推售價 (N)</option>
+            <option value="priceToMargin">輸入售價反推毛利率 (O)</option>
+        </select>
+    </div>
+
+    <div class="form-group" id="targetMarginField">
+        <label>目標毛利率 (%)</label>
+        <input type="number" id="targetMargin" value="0">
+    </div>
+
+    <div class="form-group hidden" id="targetPriceField">
+        <label>實際售價 (含稅)</label>
+        <input type="number" id="targetPrice" value="0">
+    </div>
+
+    <button onclick="calculateAll()">開始計算</button>
+    <button class="btn-save" onclick="saveRecord()">💾 儲存本次計算紀錄</button>
+
+    <div class="result-box" id="finalResult" style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+        最終結果將顯示於此。
+    </div>
+
+    <!-- 歷史紀錄區塊 -->
+    <h2>歷史紀錄</h2>
+    <div id="historyContainer">尚無紀錄。</div>
+</div>
+
+<script>
+    // 用來暫存最新的計算結果，以便點擊儲存時使用
+    let latestCalcData = null;
+
+    function togglePurchaseFields() {
+        document.getElementById('foreignFields').style.display = document.getElementById('purchaseType').value === 'foreign' ? 'block' : 'none';
+    }
+    
+    function toggleProcessedFields() {
+        document.getElementById('processedFields').style.display = document.getElementById('isProcessed').value === 'yes' ? 'block' : 'none';
+    }
+
+    function toggleProductTypeFields() {
+        let type = document.getElementById('productType').value;
+        document.getElementById('iceField').style.display = type === 'ice' ? 'block' : 'none';
+        document.getElementById('breadedField').style.display = type === 'breaded' ? 'block' : 'none';
+    }
+
+    function togglePricingFields() {
+        let method = document.getElementById('pricingMethod').value;
+        document.getElementById('bagWeightField').style.display = method === 'j2' ? 'block' : 'none';
+        document.getElementById('pieceWeightField').style.display = method === 'j3' ? 'block' : 'none';
+    }
+
+    function toggleCalcMode() {
+        let mode = document.getElementById('calcMode').value;
+        document.getElementById('targetMarginField').style.display = mode === 'marginToPrice' ? 'block' : 'none';
+        document.getElementById('targetPriceField').style.display = mode === 'priceToMargin' ? 'block' : 'none';
+    }
+
+    function calculateAll() {
+        // 第一部分計算
+        let pType = document.getElementById('purchaseType').value;
+        let rawPrice = parseFloat(document.getElementById('rawMaterialPrice').value) || 0;
+        let part1Cost = 0;
+
+        if (pType === 'foreign') {
+            let exRate = parseFloat(document.getElementById('exchangeRate').value) || 1;
+            let tariff = parseFloat(document.getElementById('tariffRate').value) || 0;
+            let misc = parseFloat(document.getElementById('miscFees').value) || 0;
+            part1Cost = (rawPrice * exRate) * (1 + (tariff / 100)) + misc;
+        } else {
+            part1Cost = rawPrice;
+        }
+        document.getElementById('part1Result').innerText = `原料成本 (台幣): ${part1Cost.toFixed(2)} 元`;
+
+        // 第二部分計算
+        let isProcessed = document.getElementById('isProcessed').value;
+        let finalUntaxedCost = part1Cost;
+        let processNameStr = isProcessed === 'yes' ? (document.getElementById('processedName').value || "未命名加工品") : "未加工原料";
+
+        if (isProcessed === 'yes') {
+            let lossA = parseFloat(document.getElementById('lossA').value) || 0;
+            let lossB = parseFloat(document.getElementById('lossB').value) || 0;
+            let lossC = parseFloat(document.getElementById('lossC').value) || 0;
+            let lossD = parseFloat(document.getElementById('lossD').value) || 0;
+            let lossE = parseFloat(document.getElementById('lossE').value) || 0;
+            
+            let yieldRate = 100 - (lossA + lossB + lossC + lossD + lossE);
+            if (yieldRate <= 0) yieldRate = 1; 
+            
+            let costG = part1Cost / (yieldRate / 100);
+            
+            let prodType = document.getElementById('productType').value;
+            let finishedMaterialCost = costG;
+            if (prodType === 'ice') {
+                let iceRate = parseFloat(document.getElementById('iceRate').value) || 0;
+                finishedMaterialCost = costG * (1 - (iceRate / 100));
+            } else if (prodType === 'breaded') {
+                let breadRate = parseFloat(document.getElementById('breadingRate').value) || 0;
+                finishedMaterialCost = costG * (1 - (breadRate / 100));
+            }
+
+            let pricingMethod = document.getElementById('pricingMethod').value;
+            let unitCost = finishedMaterialCost;
+            if (pricingMethod === 'j2') {
+                let weightBag = parseFloat(document.getElementById('weightPerBag').value) || 1;
+                unitCost = finishedMaterialCost * weightBag;
+            } else if (pricingMethod === 'j3') {
+                let weightPiece = parseFloat(document.getElementById('weightPerPiece').value) || 1;
+                unitCost = finishedMaterialCost * weightPiece;
+            }
+
+            let transferPrice = parseFloat(document.getElementById('transferPrice').value) || 0;
+            finalUntaxedCost = unitCost + transferPrice;
+        }
+        
+        let unitText = "元";
+        if(isProcessed === 'yes') {
+            let pm = document.getElementById('pricingMethod').value;
+            if(pm === 'j1') unitText = "元/公斤";
+            if(pm === 'j2') unitText = "元/包";
+            if(pm === 'j3') unitText = "元/件";
+        }
+
+        document.getElementById('part2Result').innerText = `加工品成本 (未稅): ${finalUntaxedCost.toFixed(2)} ${unitText}`;
+
+        // 第三部分計算
+        let taxedCost = finalUntaxedCost * 1.05;
+        document.getElementById('taxedCostResult').innerText = `含稅成本 (M): ${taxedCost.toFixed(2)} ${unitText}`;
+
+        let calcMode = document.getElementById('calcMode').value;
+        let finalResultText = "";
+
+        if (calcMode === 'marginToPrice') {
+            let margin = parseFloat(document.getElementById('targetMargin').value) || 0;
+            let recommendedPrice = taxedCost / (1 - (margin / 100));
+            finalResultText = `建議售價 (N): ${recommendedPrice.toFixed(2)} ${unitText}`;
+        } else {
+            let targetPrice = parseFloat(document.getElementById('targetPrice').value) || 0;
+            let actualMargin = ((targetPrice - taxedCost) / targetPrice) * 100;
+            finalResultText = `反推毛利率 (O): ${actualMargin.toFixed(2)} %`;
+        }
+
+        document.getElementById('finalResult').innerText = finalResultText;
+
+        // 將計算結果存入暫存變數
+        latestCalcData = {
+            name: processNameStr,
+            date: new Date().toLocaleString(),
+            untaxed: `${finalUntaxedCost.toFixed(2)} ${unitText}`,
+            taxed: `${taxedCost.toFixed(2)} ${unitText}`,
+            result: finalResultText
+        };
+    }
+
+    // 儲存紀錄至 LocalStorage
+    function saveRecord() {
+        if (!latestCalcData) {
+            alert("請先點擊「開始計算」產生結果後再儲存！");
+            return;
+        }
+        // 從 LocalStorage 取得舊紀錄（若無則建立空陣列）
+        let history = JSON.parse(localStorage.getItem('costAppHistory')) || [];
+        // 將最新紀錄加入陣列開頭
+        history.unshift(latestCalcData);
+        // 存回 LocalStorage
+        localStorage.setItem('costAppHistory', JSON.stringify(history));
+        alert("✅ 紀錄已成功儲存！");
+        renderHistory(); // 重新渲染畫面
+    }
+
+    // 刪除單筆紀錄
+    function deleteRecord(index) {
+        let history = JSON.parse(localStorage.getItem('costAppHistory')) || [];
+        history.splice(index, 1);
+        localStorage.setItem('costAppHistory', JSON.stringify(history));
+        renderHistory();
+    }
+
+    // 渲染歷史紀錄畫面
+    function renderHistory() {
+        let history = JSON.parse(localStorage.getItem('costAppHistory')) || [];
+        let container = document.getElementById('historyContainer');
+        
+        if (history.length === 0) {
+            container.innerHTML = "尚無紀錄。";
+            return;
+        }
+
+        let html = '<ul class="history-list">';
+        history.forEach((item, index) => {
+            html += `
+                <li>
+                    <div class="history-date">${item.date}</div>
+                    <strong>品名：</strong>${item.name} <br>
+                    <strong>未稅成本：</strong>${item.untaxed} | <strong>含稅成本：</strong>${item.taxed} <br>
+                    <strong style="color:#155724;">${item.result}</strong>
+                    <button class="btn-delete" onclick="deleteRecord(${index})">刪除紀錄</button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        container.innerHTML = html;
+    }
+
+    // 網頁載入時自動讀取歷史紀錄
+    window.onload = renderHistory;
+</script>
+</body>
+</html>
